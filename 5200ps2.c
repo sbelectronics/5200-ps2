@@ -19,18 +19,51 @@
 #define SPI_MISO_PIN  PB1
 #define SPI_MOSI_PIN  PB0
 
+#define TRIG0_PIN PA0
+#define TRIG1_PIN PA1
+
 #define SPI_MOSI_HIGH PORTB |= (1<<SPI_MOSI_PIN)
 #define SPI_MOSI_LOW PORTB &= ~(1<<SPI_MOSI_PIN)
 #define SPI_CLK_HIGH PORTB |= (1<<SPI_CLK_PIN)
 #define SPI_CLK_LOW PORTB &= ~(1<<SPI_CLK_PIN)
 #define POT0_CS_HIGH PORTB |= (1<<POT0_CS_PIN)
 #define POT0_CS_LOW PORTB &= ~(1<<POT0_CS_PIN)
-#define POT1_CS_HIGH PORTB |= (1<<POT0_CS_PIN)
-#define POT1_CS_LOW PORTB &= ~(1<<POT0_CS_PIN)
-#define PS2_CS_HIGH PORTB |= (1<<POT0_CS_PIN)
-#define PS2_CS_LOW PORTB &= ~(1<<POT0_CS_PIN)
+#define POT1_CS_HIGH PORTB |= (1<<POT1_CS_PIN)
+#define POT1_CS_LOW PORTB &= ~(1<<POT1_CS_PIN)
+#define PS2_CS_HIGH PORTB |= (1<<PS2_CS_PIN)
+#define PS2_CS_LOW PORTB &= ~(1<<PS2_CS_PIN)
+
+#define TRIG0_HIGH PORTA |= (1<<TRIG0_PIN)
+#define TRIG0_LOW PORTA &= ~(1<<TRIG0_PIN)
+#define TRIG1_HIGH PORTA |= (1<<TRIG1_PIN)
+#define TRIG1_LOW PORTA &= ~(1<<TRIG1_PIN)
+
+
+#define BUT_SELECT 0x01
+#define BUT_L3 0x02
+#define BUT_R3 0x04
+#define BUT_START 0x08
+#define BUT_UP 0x10
+#define BUT_RIGHT 0x20
+#define BUT_DOWN 0x40
+#define BUT_LEFT 0x80
+
+#define BUT_L2 0x01
+#define BUT_R2 0x02
+#define BUT_L1 0x04
+#define BUT_R1 0x08
+#define BUT_TRIANGLE 0x10
+#define BUT_O 0x20
+#define BUT_X 0x40
+#define BUT_SQUARE 0x80
+
+#define BUT_FIRE0 (BUT_L1 | BUT_R1)
+#define BUT_FIRE1 (BUT_L2 | BUT_R2)
 
 uint8_t mode, rx, ry, lx, ly, buttons0, buttons1;
+
+void setPOT0(uint8_t pot_num, uint8_t pot_val);
+void setPOT1(uint8_t pot_num, uint8_t pot_val);
 
 void writeSPI(uint8_t v)
 {
@@ -57,6 +90,8 @@ uint8_t ps2Transfer(uint8_t v)
     in_v=0;
 
     for (i=0; i<8; i++) {
+        in_v = in_v >> 1;
+
         if (v & 1) {
             SPI_MOSI_HIGH;
         } else {
@@ -67,17 +102,18 @@ uint8_t ps2Transfer(uint8_t v)
 
         _delay_us(1);
 
-        if (PORTB & SPI_MISO_PIN) {
+        if (PINB & (1<<SPI_MISO_PIN)) {
             in_v = in_v | 128;
         }
 
-        in_v = in_v >> 1;
         v = v >> 1;
 
         SPI_CLK_HIGH;
     }
 
     _delay_us(20);
+
+    SPI_MOSI_HIGH;
 
     return in_v;
 }
@@ -144,6 +180,7 @@ void ps2_setup()
    mode = 0;
 
    while (mode != 0x73) {
+       setPOT0(1, 50);
        ps2_enter_config();
        _delay_ms(1);
        ps2_config_analog();
@@ -151,7 +188,10 @@ void ps2_setup()
        ps2_exit_config();
        _delay_ms(10);
        ps2_poll(); // this will set mode as a side-effect
+       setPOT0(1, 80);
    }
+
+   setPOT0(1, 150);
 }
 
 void setPOT0(uint8_t pot_num, uint8_t pot_val)
@@ -171,23 +211,49 @@ void setPOT1(uint8_t pot_num, uint8_t pot_val)
 }
 
 int main() {
-    // configure SPI pins as outputs
+    // outputs
     DDRB |= (1<<SPI_MOSI_PIN);
     DDRB |= (1<<SPI_CLK_PIN);
     DDRB |= (1<<POT0_CS_PIN);
     DDRB |= (1<<POT1_CS_PIN);
     DDRB |= (1<<PS2_CS_PIN);
+    DDRA |= (1<<TRIG0_PIN);
+    DDRA |= (1<<TRIG1_PIN);
+
+    // inputs
+    DDRB &= ~(1<<SPI_MISO_PIN);
+    PORTB |= (1<<SPI_MISO_PIN); // enable pullup
+
+    // default all CS to high
+    POT0_CS_HIGH;
+    POT1_CS_HIGH;
+    PS2_CS_HIGH;
 
     SPI_CLK_HIGH;
 
     ps2_setup();
     while (1) {
         ps2_poll();
-        setPOT0(0, rx);
-        setPOT0(0, ry);
-        setPOT1(1, lx);
+        //setPOT0(0, rx);
+        //setPOT0(1, ry);
+        setPOT1(0, lx);
         setPOT1(1, ly);
 
+        if ((buttons1 & BUT_FIRE0) != BUT_FIRE0) {
+            TRIG0_HIGH;
+            setPOT0(0,0);
+        } else {
+            TRIG0_LOW;
+            setPOT0(0,100);
+        }
+
+        if ((buttons1 & BUT_FIRE1) != BUT_FIRE1) {
+            TRIG1_HIGH;
+            setPOT0(0,0);
+        } else {
+            TRIG1_LOW;
+            setPOT0(0,100);
+        }
 
     }
     return 0;
