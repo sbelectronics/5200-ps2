@@ -60,6 +60,9 @@
 #define BUT_FIRE0 (BUT_L1 | BUT_R1)
 #define BUT_FIRE1 (BUT_L2 | BUT_R2)
 
+#define XFUNC(v)  ((v-128)*17/20)+128-4
+#define YFUNC(v)  ((v-128)*18/20)+128
+
 uint8_t mode, rx, ry, lx, ly, buttons0, buttons1;
 
 void setPOT0(uint8_t pot_num, uint8_t pot_val);
@@ -234,8 +237,8 @@ int main() {
     ps2_setup();
     while (1) {
         ps2_poll();
-        setPOT0(0, rx);
-        setPOT0(1, ry);
+        setPOT0(0, XFUNC(rx));
+        setPOT0(1, YFUNC(ry));
         setPOT1(0, lx);
         setPOT1(1, ly);
 
