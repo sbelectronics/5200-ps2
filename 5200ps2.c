@@ -234,25 +234,21 @@ int main() {
     ps2_setup();
     while (1) {
         ps2_poll();
-        //setPOT0(0, rx);
-        //setPOT0(1, ry);
+        setPOT0(0, rx);
+        setPOT0(1, ry);
         setPOT1(0, lx);
         setPOT1(1, ly);
 
         if ((buttons1 & BUT_FIRE0) != BUT_FIRE0) {
-            TRIG0_HIGH;
-            setPOT0(0,0);
-        } else {
             TRIG0_LOW;
-            setPOT0(0,100);
+        } else {
+            TRIG0_HIGH;
         }
 
         if ((buttons1 & BUT_FIRE1) != BUT_FIRE1) {
-            TRIG1_HIGH;
-            setPOT0(0,0);
-        } else {
             TRIG1_LOW;
-            setPOT0(0,100);
+        } else {
+            TRIG1_HIGH;
         }
 
     }
