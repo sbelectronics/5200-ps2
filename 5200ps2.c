@@ -180,7 +180,15 @@ int main() {
 
     SPI_CLK_HIGH;
 
+    ps2_setup();
     while (1) {
+        ps2_poll();
+        setPOT0(0, rx);
+        setPOT0(0, ry);
+        setPOT1(1, lx);
+        setPOT1(1, ly);
+
+
     }
     return 0;
 }

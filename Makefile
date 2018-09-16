@@ -6,7 +6,7 @@ CLOCK      = 8000000
 PROGRAMMER = -c usbtiny 
 # for ATTiny861
 # see http://www.engbedded.com/fusecalc/
-FUSES       = -U lfuse:w:0x62:m -U hfuse:w:0xdf:m -U efuse:w:0xff:m 
+FUSES       = -U lfuse:w:0xE2:m -U hfuse:w:0xdf:m -U efuse:w:0xff:m 
 
 # Tune the lines below only if you know what you are doing:
 AVRDUDE = avrdude $(PROGRAMMER) -p $(DEVICE)
@@ -25,10 +25,10 @@ all:	5200ps2.hex
 	$(COMPILE) -S $< -o $@
 
 flash:	all
-	$(AVRDUDE) -U flash:w:5200ps2.hex:i
+	$(AVRDUDE) -B 3 -c usbasp -U flash:w:5200ps2.hex:i
 
 fuse:
-	$(AVRDUDE) $(FUSES)
+	$(AVRDUDE) -B 3 -c usbasp $(FUSES)
 
 # Xcode uses the Makefile targets "", "clean" and "install"
 install: flash fuse
