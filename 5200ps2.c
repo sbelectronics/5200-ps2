@@ -63,10 +63,16 @@
 #define XFUNC(v)  ((v-128)*17/20)+128-4
 #define YFUNC(v)  ((v-128)*18/20)+128
 
-uint8_t mode, rx, ry, lx, ly, buttons0, buttons1;
+#define MODE_AMBIDEXTROUS 0
+#define MODE_LEFT 1
+#define MODE_RIGHT 2
+
+uint8_t device_mode, rx, ry, lx, ly, buttons0, buttons1, mode;
 
 void setPOT0(uint8_t pot_num, uint8_t pot_val);
 void setPOT1(uint8_t pot_num, uint8_t pot_val);
+
+#define absminus(a,b) (a>=b) ? (a-b) : (b-a)
 
 void writeSPI(uint8_t v)
 {
@@ -167,7 +173,7 @@ void ps2_poll()
 {
     PS2_CS_LOW;
     ps2Transfer(0x01);
-    mode = ps2Transfer(0x42);  // 0x73 if analog
+    device_mode = ps2Transfer(0x42);  // 0x73 if analog
     ps2Transfer(0x00);
     buttons0 = ps2Transfer(0x00);
     buttons1 = ps2Transfer(0x00);
@@ -180,9 +186,9 @@ void ps2_poll()
 
 void ps2_setup()
 {
-   mode = 0;
+   device_mode = 0;
 
-   while (mode != 0x73) {
+   while (device_mode != 0x73) {
        setPOT0(1, 50);
        ps2_enter_config();
        _delay_ms(1);
@@ -190,7 +196,7 @@ void ps2_setup()
        _delay_ms(10);
        ps2_exit_config();
        _delay_ms(10);
-       ps2_poll(); // this will set mode as a side-effect
+       ps2_poll(); // this will set device_mode as a side-effect
        setPOT0(1, 80);
    }
 
@@ -213,7 +219,18 @@ void setPOT1(uint8_t pot_num, uint8_t pot_val)
     POT1_CS_HIGH;
 }
 
+uint8_t max(uint8_t x, uint8_t y)
+{
+    if (x>y) {
+        return x;
+    } else {
+        return y;
+    }
+}
+
 int main() {
+    uint8_t deltar, deltal, ambistick;
+
     // outputs
     DDRB |= (1<<SPI_MOSI_PIN);
     DDRB |= (1<<SPI_CLK_PIN);
@@ -234,13 +251,62 @@ int main() {
 
     SPI_CLK_HIGH;
 
+    mode = MODE_AMBIDEXTROUS;
+    ambistick = 0;
+
     ps2_setup();
+
     while (1) {
         ps2_poll();
-        setPOT0(0, XFUNC(rx));
-        setPOT0(1, YFUNC(ry));
-        setPOT1(0, lx);
-        setPOT1(1, ly);
+
+        // weird note: if the setPOTs don't get called, the triggers will go haywire
+
+        switch (mode) {
+            case MODE_AMBIDEXTROUS:
+                deltar = max(absminus(rx,128), absminus(ry,128));
+                deltal = max(absminus(lx,128), absminus(ly,128));
+                if (deltar>64) {
+                    ambistick = 0;
+                } else if (deltal>64) {
+                    ambistick = 1;
+                }
+                if (ambistick == 0) {
+                    setPOT0(0, XFUNC(rx));
+                    setPOT0(1, YFUNC(ry));
+                    setPOT1(0, XFUNC(rx));
+                    setPOT1(1, YFUNC(ry));
+                } else {
+                    setPOT0(0, XFUNC(lx));
+                    setPOT0(1, YFUNC(ly));
+                    setPOT1(0, XFUNC(lx));
+                    setPOT1(1, YFUNC(ly));
+                }
+                break;
+
+            case MODE_RIGHT:
+                setPOT0(0, XFUNC(rx));
+                setPOT0(1, YFUNC(ry));
+                setPOT1(0, XFUNC(lx));
+                setPOT1(1, XFUNC(ly));
+                break;
+
+            case MODE_LEFT:
+                setPOT0(0, XFUNC(lx));
+                setPOT0(1, YFUNC(ly));
+                setPOT1(0, XFUNC(rx));
+                setPOT1(1, YFUNC(ry));
+                break;
+        }
+
+        if ((buttons0 & BUT_SELECT) == 0) {
+            if ((buttons1 & BUT_TRIANGLE) == 0) {
+                mode = MODE_AMBIDEXTROUS;
+            } else if ((buttons1 & BUT_SQUARE) == 0) {
+                mode = MODE_LEFT;
+            } else if ((buttons1 & BUT_O) == 0) {
+                mode = MODE_RIGHT;
+            }
+        }
 
         if ((buttons1 & BUT_FIRE0) != BUT_FIRE0) {
             TRIG0_LOW;
