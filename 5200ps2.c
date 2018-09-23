@@ -19,8 +19,16 @@
 #define SPI_MISO_PIN  PB1
 #define SPI_MOSI_PIN  PB0
 
-#define TRIG0_PIN PA0
+#define TRIG0_PIN PA0    // primary controller port
 #define TRIG1_PIN PA1
+#define TRIG01_PIN PA2   // secondary controller port
+#define TRIG11_PIN PA3
+
+#define KSPR_MC_PIN PB6
+#define KSPR_KPD_PIN PA4
+#define K321S_PIN PA5
+#define K987R_PIN PA6
+#define K654P_PIN PA7
 
 #define SPI_MOSI_HIGH PORTB |= (1<<SPI_MOSI_PIN)
 #define SPI_MOSI_LOW PORTB &= ~(1<<SPI_MOSI_PIN)
@@ -37,6 +45,10 @@
 #define TRIG0_LOW PORTA &= ~(1<<TRIG0_PIN)
 #define TRIG1_HIGH PORTA |= (1<<TRIG1_PIN)
 #define TRIG1_LOW PORTA &= ~(1<<TRIG1_PIN)
+#define TRIG01_HIGH PORTA |= (1<<TRIG01_PIN)
+#define TRIG01_LOW PORTA &= ~(1<<TRIG01_PIN)
+#define TRIG11_HIGH PORTA |= (1<<TRIG11_PIN)
+#define TRIG11_LOW PORTA &= ~(1<<TRIG11_PIN)
 
 
 #define BUT_SELECT 0x01
@@ -57,17 +69,22 @@
 #define BUT_X 0x40
 #define BUT_SQUARE 0x80
 
-#define BUT_FIRE0 (BUT_L1 | BUT_R1)
-#define BUT_FIRE1 (BUT_L2 | BUT_R2)
+#define BUT_FIRE0 (BUT_L1 | BUT_R1 | BUT_TRIANGLE)
+#define BUT_FIRE1 (BUT_L2 | BUT_R2 | BUT_X)
 
-#define XFUNC(v)  ((v-128)*17/20)+128-4
-#define YFUNC(v)  ((v-128)*18/20)+128
+#define KPD_NONE 0
+#define KPD_START 1
+#define KPD_PAUSE 2
+#define KPD_RESET 3
+
+#define XFUNC(v)  ((v-128)*16/20)+128-10
+#define YFUNC(v)  ((v-128)*17/20)+128-10
 
 #define MODE_AMBIDEXTROUS 0
 #define MODE_LEFT 1
 #define MODE_RIGHT 2
 
-uint8_t device_mode, rx, ry, lx, ly, buttons0, buttons1, mode;
+uint8_t device_mode, rx, ry, lx, ly, buttons0, buttons1, mode, kpd_down, kpd_desired;
 
 void setPOT0(uint8_t pot_num, uint8_t pot_val);
 void setPOT1(uint8_t pot_num, uint8_t pot_val);
@@ -173,14 +190,25 @@ void ps2_poll()
 {
     PS2_CS_LOW;
     ps2Transfer(0x01);
-    device_mode = ps2Transfer(0x42);  // 0x73 if analog
+    device_mode = ps2Transfer(0x42);  // High nibble is mode (0x70=analog, 0x40=digital). Low nibble is num words.
     ps2Transfer(0x00);
-    buttons0 = ps2Transfer(0x00);
-    buttons1 = ps2Transfer(0x00);
-    rx = ps2Transfer(0x00);
-    ry = ps2Transfer(0x00);
-    lx = ps2Transfer(0x00);
-    ly = ps2Transfer(0x00);
+    if ((device_mode & 0xF0) == 0x70) {
+        buttons0 = ps2Transfer(0x00);
+        buttons1 = ps2Transfer(0x00);
+        rx = ps2Transfer(0x00);
+        ry = ps2Transfer(0x00);
+        lx = ps2Transfer(0x00);
+        ly = ps2Transfer(0x00);
+    } else {
+        // Something unexpected happened. Let's read the bytes from the controller, but don't store
+        // them.
+        ps2Transfer(0x00);
+        ps2Transfer(0x00);
+        ps2Transfer(0x00);
+        ps2Transfer(0x00);
+        ps2Transfer(0x00);
+        ps2Transfer(0x00);
+    }
     PS2_CS_HIGH;
 }
 
@@ -228,8 +256,25 @@ uint8_t max(uint8_t x, uint8_t y)
     }
 }
 
+/*ISR(PCINT_vect)
+{
+    if (PINA & (1<<KSPR_KPD_PIN)) {
+        if (PINA & (1<<K321S_PIN)) {
+            kpd_down = KPD_START;
+        } else if (PINA & (1<<K987R_PIN)) {
+            kpd_down = KPD_PAUSE;
+        } else if (PINA & (1<<K654P_PIN)) {
+            kpd_down = KPD_RESET;
+        } else {
+            kpd_down = KPD_NONE;
+        }
+    } else {
+        kpd_down = KPD_NONE;
+    }
+}*/
+
 int main() {
-    uint8_t deltar, deltal, ambistick;
+    uint8_t deltar, deltal, ambistick, select_pressed;
 
     // outputs
     DDRB |= (1<<SPI_MOSI_PIN);
@@ -239,6 +284,8 @@ int main() {
     DDRB |= (1<<PS2_CS_PIN);
     DDRA |= (1<<TRIG0_PIN);
     DDRA |= (1<<TRIG1_PIN);
+    DDRA |= (1<<TRIG01_PIN);
+    DDRA |= (1<<TRIG11_PIN);
 
     // inputs
     DDRB &= ~(1<<SPI_MISO_PIN);
@@ -249,18 +296,43 @@ int main() {
     POT1_CS_HIGH;
     PS2_CS_HIGH;
 
+    // default all triggers to high
+    TRIG0_HIGH;
+    TRIG1_HIGH;
+    TRIG01_HIGH;
+    TRIG11_HIGH;
+
     SPI_CLK_HIGH;
 
     mode = MODE_AMBIDEXTROUS;
     ambistick = 0;
+
+    // Set default buttons state from the ps2 controller as all unpushed.
+    buttons0 = 0xFF;
+    buttons1 = 0xFF;
+
+    /*
+    kpd_down = KPD_NONE;
+    PCMSK0 |= 0xE0; // PCINT5, PCINT6, PCINT7
+    GIMSK |= 0x20; // PCIE1
+    sei();*/
 
     ps2_setup();
 
     while (1) {
         ps2_poll();
 
-        // weird note: if the setPOTs don't get called, the triggers will go haywire
+        select_pressed = ((buttons0 & BUT_SELECT) == 0);
 
+        /* if (kpd_down == KPD_START) {
+            setPOT0(0,50);
+        } else if (kpd_down == KPD_PAUSE) {
+            setPOT0(0,100);
+        } else if (kpd_down == KPD_RESET) {
+            setPOT0(0,150);
+        } else */
+
+        // weird note: if the setPOTs don't get called, the triggers will go haywires
         switch (mode) {
             case MODE_AMBIDEXTROUS:
                 deltar = max(absminus(rx,128), absminus(ry,128));
@@ -298,7 +370,9 @@ int main() {
                 break;
         }
 
-        if ((buttons0 & BUT_SELECT) == 0) {
+        // Handle select button logic, to change modes if select + some other button is pushed.
+
+        if (select_pressed) {
             if ((buttons1 & BUT_TRIANGLE) == 0) {
                 mode = MODE_AMBIDEXTROUS;
             } else if ((buttons1 & BUT_SQUARE) == 0) {
@@ -308,13 +382,15 @@ int main() {
             }
         }
 
-        if ((buttons1 & BUT_FIRE0) != BUT_FIRE0) {
+        // Trigger logic. BUT_FIRE0 and BUT_FIRE1 each map to several possible fire buttons.
+
+        if (!select_pressed && ((buttons1 & BUT_FIRE0) != BUT_FIRE0)) {
             TRIG0_LOW;
         } else {
             TRIG0_HIGH;
         }
 
-        if ((buttons1 & BUT_FIRE1) != BUT_FIRE1) {
+        if (!select_pressed && ((buttons1 & BUT_FIRE1) != BUT_FIRE1)) {
             TRIG1_LOW;
         } else {
             TRIG1_HIGH;
