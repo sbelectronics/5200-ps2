@@ -23,6 +23,8 @@ Left-dual-stick mode may be entered by holding down *select* and *square* at the
 
 *L2*, *R2*, and *X* may all be used interchangeably as trigger 1.
 
+Pressing *Start* will function as the Atari 5200 Start Button. Pressing *select* and *start* at the same time will function as the Reset button. Pressing *select* and *X* at the same time will function as the pause button. I suggest pressing and holding select first, then press and release the second button.
+
 Please connect the ps2 controller to the board *before* connecting the board to your atari 5200.
 
 ## Programming

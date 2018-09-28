@@ -11,6 +11,9 @@
 #include <util/atomic.h>
 #include <util/delay.h>
 
+#define TRUE 1
+#define FALSE 0
+
 #define POT0_CS_PIN PB3
 #define POT1_CS_PIN PB4
 #define PS2_CS_PIN PB5
@@ -50,6 +53,15 @@
 #define TRIG11_HIGH PORTA |= (1<<TRIG11_PIN)
 #define TRIG11_LOW PORTA &= ~(1<<TRIG11_PIN)
 
+#define KSPR_MC_HIGH PORTB |= (1<<KSPR_MC_PIN)
+#define KSPR_MC_LOW PORTB &= ~(1<<KSPR_MC_PIN)
+
+#define K321S_FLOAT DDRA &= ~(1<<K321S_PIN)
+#define K321S_LOW DDRA |= (1<<K321S_PIN)
+#define K987R_FLOAT DDRA &= ~(1<<K987R_PIN)
+#define K987R_LOW DDRA |= (1<<K987R_PIN)
+#define K654P_FLOAT DDRA &= ~(1<<K654P_PIN)
+#define K654P_LOW DDRA |= (1<<K654P_PIN)
 
 #define BUT_SELECT 0x01
 #define BUT_L3 0x02
@@ -84,7 +96,7 @@
 #define MODE_LEFT 1
 #define MODE_RIGHT 2
 
-uint8_t device_mode, rx, ry, lx, ly, buttons0, buttons1, mode, kpd_down, kpd_desired;
+uint8_t device_mode, rx, ry, lx, ly, buttons0, buttons1, mode, kpd_down, kpd_desired, matrix_mask;
 
 void setPOT0(uint8_t pot_num, uint8_t pot_val);
 void setPOT1(uint8_t pot_num, uint8_t pot_val);
@@ -256,25 +268,17 @@ uint8_t max(uint8_t x, uint8_t y)
     }
 }
 
-/*ISR(PCINT_vect)
+ISR(PCINT_vect)
 {
-    if (PINA & (1<<KSPR_KPD_PIN)) {
-        if (PINA & (1<<K321S_PIN)) {
-            kpd_down = KPD_START;
-        } else if (PINA & (1<<K987R_PIN)) {
-            kpd_down = KPD_PAUSE;
-        } else if (PINA & (1<<K654P_PIN)) {
-            kpd_down = KPD_RESET;
-        } else {
-            kpd_down = KPD_NONE;
-        }
+    if ((PINA & (1<<KSPR_KPD_PIN)) == 0) {
+        DDRA |= matrix_mask;
     } else {
-        kpd_down = KPD_NONE;
+        DDRA &= ~((1<<K321S_PIN) | (1<<K987R_PIN) | (1<<K654P_PIN));
     }
-}*/
+}
 
 int main() {
-    uint8_t deltar, deltal, ambistick, select_pressed;
+    uint8_t deltar, deltal, ambistick, select_pressed, matrix_mask_new;
 
     // outputs
     DDRB |= (1<<SPI_MOSI_PIN);
@@ -291,10 +295,25 @@ int main() {
     DDRB &= ~(1<<SPI_MISO_PIN);
     PORTB |= (1<<SPI_MISO_PIN); // enable pullup
 
+    DDRA &= ~(1<<KSPR_KPD_PIN);
+    PORTA |= (1<<KSPR_KPD_PIN); // enable pullup
+
+    K321S_FLOAT;
+    K987R_FLOAT;
+    K654P_FLOAT;
+
+    // set all three keypad pins low, these will function as open collector outputs
+    PORTA &= ~(1<<K321S_PIN);
+    PORTA &= ~(1<<K987R_PIN);
+    PORTA &= ~(1<<K654P_PIN);
+
     // default all CS to high
     POT0_CS_HIGH;
     POT1_CS_HIGH;
     PS2_CS_HIGH;
+
+    // default matrix keypad to no push signal
+    KSPR_MC_LOW;
 
     // default all triggers to high
     TRIG0_HIGH;
@@ -306,16 +325,16 @@ int main() {
 
     mode = MODE_AMBIDEXTROUS;
     ambistick = 0;
+    matrix_mask = 0;
 
     // Set default buttons state from the ps2 controller as all unpushed.
     buttons0 = 0xFF;
     buttons1 = 0xFF;
 
-    /*
     kpd_down = KPD_NONE;
-    PCMSK0 |= 0xE0; // PCINT5, PCINT6, PCINT7
+    PCMSK0 |= 0x10; // PCINT4
     GIMSK |= 0x20; // PCIE1
-    sei();*/
+    sei();
 
     ps2_setup();
 
@@ -323,14 +342,6 @@ int main() {
         ps2_poll();
 
         select_pressed = ((buttons0 & BUT_SELECT) == 0);
-
-        /* if (kpd_down == KPD_START) {
-            setPOT0(0,50);
-        } else if (kpd_down == KPD_PAUSE) {
-            setPOT0(0,100);
-        } else if (kpd_down == KPD_RESET) {
-            setPOT0(0,150);
-        } else */
 
         // weird note: if the setPOTs don't get called, the triggers will go haywires
         switch (mode) {
@@ -370,8 +381,9 @@ int main() {
                 break;
         }
 
-        // Handle select button logic, to change modes if select + some other button is pushed.
+        matrix_mask_new = 0;
 
+        // Handle select button logic, to change modes if select + some other button is pushed.
         if (select_pressed) {
             if ((buttons1 & BUT_TRIANGLE) == 0) {
                 mode = MODE_AMBIDEXTROUS;
@@ -380,7 +392,20 @@ int main() {
             } else if ((buttons1 & BUT_O) == 0) {
                 mode = MODE_RIGHT;
             }
+            if ((buttons0 & BUT_START) == 0) {
+                matrix_mask_new = matrix_mask_new | (1 << K987R_PIN);
+            }
+            if ((buttons1 & BUT_X) == 0) {
+                matrix_mask_new = matrix_mask_new | (1 << K654P_PIN);
+            }
+        } else {
+            if ((buttons0 & BUT_START) == 0) {
+                matrix_mask_new = matrix_mask_new | (1 << K321S_PIN);
+            }
         }
+
+        // Let the ISR deal with it
+        matrix_mask = matrix_mask_new;
 
         // Trigger logic. BUT_FIRE0 and BUT_FIRE1 each map to several possible fire buttons.
 
