@@ -1,6 +1,6 @@
 This directory contains files that may be written using the *opensource* minipro. This is not the same minipro that runs under windows. This software runs on Linux and MacOS.
 
-Find my fork at https://github.com/sbelectronics/minipro, with ATTINY861 support...
+Use radiomanV's fork of minipro at https://gitlab.com/radiomanV/minipro
 
 to program the flash:
 
@@ -8,5 +8,6 @@ to program the flash:
 
 to program the fuses
 
-    minipro -p attiny861 -c config -w fuses.txt
-    
+    minipro -p attiny861 -e -c config -w fuses.txt
+
+Program the flash first, then the fuses.
