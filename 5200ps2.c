@@ -89,8 +89,8 @@
 #define KPD_PAUSE 2
 #define KPD_RESET 3
 
-#define XFUNC(v)  ((v-128)*16/20)+128-10
-#define YFUNC(v)  ((v-128)*17/20)+128-10
+#define XFUNC(v)  ((v-128)*18/20)+128+2
+#define YFUNC(v)  ((v-128)*18/20)+128
 
 #define MODE_AMBIDEXTROUS 0
 #define MODE_LEFT 1
