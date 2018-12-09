@@ -1,3 +1,8 @@
+/*
+ * PS2 Controller Library
+ * Scott Baker, http://www.smbaker.com
+ */
+
 #include <stdio.h>
 
 #include <avr/io.h>

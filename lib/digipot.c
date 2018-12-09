@@ -1,5 +1,7 @@
-// 5200controller
-//#define F_CPU 14745600
+/*
+ * Digital Potentiometer Library
+ * Scott Baker, http://www.smbaker.com
+ */
 
 #include <stdio.h>
 

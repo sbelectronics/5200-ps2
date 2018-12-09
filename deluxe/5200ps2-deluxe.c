@@ -1,5 +1,7 @@
-// 5200controller
-//#define F_CPU 14745600
+/*
+ * Playstation PS2 to Atari 5200 Adapter Board
+ * Scott Baker, http://www.smbaker.com
+ */
 
 #include <stdio.h>
 
@@ -147,7 +149,7 @@ void setup_pins()
     DDRB |= (1<<POT1_CS_PIN);
     DDRB |= (1<<PS2_CS_PIN);*/
     DDRC |= (1<<TRIG0_PIN);
-    DDRC |= (1<<TRIG1_PIN); 
+    DDRC |= (1<<TRIG1_PIN);
 
     // inputs
     DDRB &= ~(1<<SPI_MISO_PIN);
