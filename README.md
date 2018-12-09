@@ -27,6 +27,16 @@ Pressing *Start* will function as the Atari 5200 Start Button. Pressing *select*
 
 Please connect the ps2 controller to the board *before* connecting the board to your atari 5200.
 
+## Version
+
+There are two versions of this project, "regular" and "deluxe". You can find the code in the respective subdirectories.
+
+"regular" is the original version, that used the ATTINY861.
+
+"deluxe" uses an ATMEGA328, and includes a 9-pin connector to allow an atari 2600 stick to be used.
+
+Please make sure to program your microcontroller with the appropriate code. Programming the wrong code will not work, and in the worst case could brick the microcontroller.
+
 ## Programming
 
 This project uses a microcontroller, and the microcontroller must be programmed prior to use.
