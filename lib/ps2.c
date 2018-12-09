@@ -124,17 +124,22 @@ void ps2_poll()
     PS2_CS_HIGH;
 }
 
-void ps2_setup_controller()
+void ps2_setup_once()
+{
+    ps2_enter_config();
+    _delay_ms(1);
+    ps2_config_analog();
+    _delay_ms(10);
+    ps2_exit_config();
+    _delay_ms(10);
+}
+
+void ps2_setup_controller_old()
 {
    device_mode = 0;
 
    while (device_mode != 0x73) {
-       ps2_enter_config();
-       _delay_ms(1);
-       ps2_config_analog();
-       _delay_ms(10);
-       ps2_exit_config();
-       _delay_ms(10);
+       ps2_setup_once();
        ps2_poll(); // this will set device_mode as a side-effect
    }
 }
@@ -149,4 +154,6 @@ void ps2_init(uint8_t cs_pin, uint8_t mosi_pin, uint8_t miso_pin, uint8_t clk_pi
     DDRB |= (1<< spi_mosi_pin);
     DDRB |= (1<< spi_clk_pin);
     DDRB |= (1<< ps2_cs_pin);
+
+    device_mode = 0;
 }

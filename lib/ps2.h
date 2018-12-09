@@ -22,11 +22,14 @@
 #define BUT_FIRE0 (BUT_L1 | BUT_R1 | BUT_TRIANGLE)
 #define BUT_FIRE1 (BUT_L2 | BUT_R2 | BUT_X)
 
+#define PS2_GOOD ((device_mode == 0x73) || (device_mode == 0x79))
+
 extern uint8_t ps2_cs_pin, spi_clk_pin, spi_miso_pin, spi_mosi_pin;
-extern uint8_t device_mode, rx, ry, lx, ly, buttons0, buttons1, mode, kpd_down, kpd_desired, matrix_mask;
+extern uint8_t device_mode, rx, ry, lx, ly, buttons0, buttons1;
 
 void ps2_init(uint8_t cs_pin, uint8_t mosi_pin, uint8_t miso_pin, uint8_t clk_pin);
 void ps2_setup_controller();
+void ps2_setup_once();
 void ps2_poll();
 
 #endif

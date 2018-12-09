@@ -112,7 +112,7 @@
 #define MODE_LEFT 1
 #define MODE_RIGHT 2
 
-uint8_t device_mode, rx, ry, lx, ly, buttons0, buttons1, mode, kpd_down, kpd_desired, matrix_mask;
+uint8_t mode, kpd_down, kpd_desired, matrix_mask;
 
 void setPOT0(uint8_t pot_num, uint8_t pot_val);
 void setPOT1(uint8_t pot_num, uint8_t pot_val);
@@ -173,7 +173,7 @@ ISR(PCINT2_vect)
 }
 
 int main() {
-    uint8_t deltar, deltal, ambistick, select_pressed, matrix_mask_new, digital_hpot, digital_vpot;
+    uint8_t deltar, deltal, ambistick, select_pressed, matrix_mask_new, digital_hpot, digital_vpot, fire0, fire1;
 
     // outputs
     DDRB |= (1<<SPI_MOSI_PIN);
@@ -247,16 +247,14 @@ int main() {
 
     ps2_init(PS2_CS_PIN, SPI_MOSI_PIN, SPI_MISO_PIN, SPI_CLK_PIN);
 
-    ps2_setup_controller();
-
     while (1) {
-        ps2_poll();
-
-        select_pressed = ((buttons0 & BUT_SELECT) == 0);
-
         // Start by assuming the pot is in the center
         digital_vpot = V_CENTER;
         digital_hpot = H_CENTER;
+
+        matrix_mask_new = 0;
+        fire0 = FALSE;
+        fire1 = FALSE;
 
         // Check the 2600 Joystick port
         if (NORTH_PRESSED) {
@@ -274,85 +272,95 @@ int main() {
             setPOT0(0, digital_hpot);
             setPOT0(1, digital_vpot);
         } else {
-            // weird note: if the setPOTs don't get called, the triggers will go haywires
-            switch (mode) {
-                case MODE_AMBIDEXTROUS:
-                    deltar = max(absminus(rx,128), absminus(ry,128));
-                    deltal = max(absminus(lx,128), absminus(ly,128));
-                    if (deltar>64) {
-                        ambistick = 0;
-                    } else if (deltal>64) {
-                        ambistick = 1;
-                    }
-                    if (ambistick == 0) {
+            ps2_poll();
+            if (!PS2_GOOD) {
+                ps2_setup_once();
+            } else {
+                select_pressed = ((buttons0 & BUT_SELECT) == 0);
+
+                // weird note: if the setPOTs don't get called, the triggers will go haywire
+                switch (mode) {
+                    case MODE_AMBIDEXTROUS:
+                        deltar = max(absminus(rx,128), absminus(ry,128));
+                        deltal = max(absminus(lx,128), absminus(ly,128));
+                        if (deltar>64) {
+                            ambistick = 0;
+                        } else if (deltal>64) {
+                            ambistick = 1;
+                        }
+                        if (ambistick == 0) {
+                            setPOT0(0, XFUNC(rx));
+                            setPOT0(1, YFUNC(ry));
+                            setPOT1(0, XFUNC(rx));
+                            setPOT1(1, YFUNC(ry));
+                        } else {
+                            setPOT0(0, XFUNC(lx));
+                            setPOT0(1, YFUNC(ly));
+                            setPOT1(0, XFUNC(lx));
+                            setPOT1(1, YFUNC(ly));
+                        }
+                        break;
+
+                    case MODE_RIGHT:
                         setPOT0(0, XFUNC(rx));
                         setPOT0(1, YFUNC(ry));
-                        setPOT1(0, XFUNC(rx));
-                        setPOT1(1, YFUNC(ry));
-                    } else {
+                        setPOT1(0, XFUNC(lx));
+                        setPOT1(1, XFUNC(ly));
+                        break;
+
+                    case MODE_LEFT:
                         setPOT0(0, XFUNC(lx));
                         setPOT0(1, YFUNC(ly));
-                        setPOT1(0, XFUNC(lx));
-                        setPOT1(1, YFUNC(ly));
+                        setPOT1(0, XFUNC(rx));
+                        setPOT1(1, YFUNC(ry));
+                        break;
+                }
+
+                // Handle select button logic, to change modes if select + some other button is pushed.
+                if (select_pressed) {
+                    if ((buttons1 & BUT_TRIANGLE) == 0) {
+                        mode = MODE_AMBIDEXTROUS;
+                    } else if ((buttons1 & BUT_SQUARE) == 0) {
+                        mode = MODE_LEFT;
+                    } else if ((buttons1 & BUT_O) == 0) {
+                        mode = MODE_RIGHT;
                     }
-                    break;
+                    if ((buttons0 & BUT_START) == 0) {
+                        matrix_mask_new = matrix_mask_new | (1 << K987R_PIN);
+                    }
+                    if ((buttons1 & BUT_X) == 0) {
+                        matrix_mask_new = matrix_mask_new | (1 << K654P_PIN);
+                    }
+                } else {
+                    if ((buttons0 & BUT_START) == 0) {
+                        matrix_mask_new = matrix_mask_new | (1 << K321S_PIN);
+                    }
 
-                case MODE_RIGHT:
-                    setPOT0(0, XFUNC(rx));
-                    setPOT0(1, YFUNC(ry));
-                    setPOT1(0, XFUNC(lx));
-                    setPOT1(1, XFUNC(ly));
-                    break;
-
-                case MODE_LEFT:
-                    setPOT0(0, XFUNC(lx));
-                    setPOT0(1, YFUNC(ly));
-                    setPOT1(0, XFUNC(rx));
-                    setPOT1(1, YFUNC(ry));
-                    break;
+                    fire0 = fire0 || (!select_pressed && ((buttons1 & BUT_FIRE0) != BUT_FIRE0));
+                    fire1 = fire1 || (!select_pressed && ((buttons1 & BUT_FIRE1) != BUT_FIRE1));
+                }
             }
         }
 
-        matrix_mask_new = 0;
-
-        // Handle select button logic, to change modes if select + some other button is pushed.
-        if (select_pressed) {
-            if ((buttons1 & BUT_TRIANGLE) == 0) {
-                mode = MODE_AMBIDEXTROUS;
-            } else if ((buttons1 & BUT_SQUARE) == 0) {
-                mode = MODE_LEFT;
-            } else if ((buttons1 & BUT_O) == 0) {
-                mode = MODE_RIGHT;
-            }
-            if ((buttons0 & BUT_START) == 0) {
-                matrix_mask_new = matrix_mask_new | (1 << K987R_PIN);
-            }
-            if ((buttons1 & BUT_X) == 0) {
-                matrix_mask_new = matrix_mask_new | (1 << K654P_PIN);
-            }
-        } else {
-            if ((buttons0 & BUT_START) == 0) {
-                matrix_mask_new = matrix_mask_new | (1 << K321S_PIN);
-            }
-        }
-
-        // Let the ISR deal with it
+       // Let the ISR deal with it
         matrix_mask = matrix_mask_new;
 
-        // Trigger logic. BUT_FIRE0 and BUT_FIRE1 each map to several possible fire buttons.
+        fire0 = fire0 || FIRE0_PRESSED;
+        fire1 = fire1 || FIRE1_PRESSED;
 
-        if ((!select_pressed && ((buttons1 & BUT_FIRE0) != BUT_FIRE0)) || (FIRE0_PRESSED)) {
+        if (fire0) {
             TRIG0_LOW;
         } else {
             TRIG0_HIGH;
         }
 
-        if ((!select_pressed && ((buttons1 & BUT_FIRE1) != BUT_FIRE1)) || (FIRE1_PRESSED)) {
+        if (fire1) {
             TRIG1_LOW;
         } else {
             TRIG1_HIGH;
         }
 
+        _delay_ms(5);
     }
     return 0;
 }
