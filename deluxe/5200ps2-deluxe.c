@@ -174,10 +174,8 @@ ISR(PCINT2_vect)
     }
 }
 
-int main() {
-    uint8_t deltar, deltal, ambistick, select_pressed, matrix_mask_new;
-    uint8_t digital_hpot0, digital_vpot0, digital_hpot1, digital_vpot1, fire0, fire1;
-
+void setup_pins()
+{
     // outputs
     DDRB |= (1<<SPI_MOSI_PIN);
     DDRB |= (1<<SPI_CLK_PIN);
@@ -186,8 +184,6 @@ int main() {
     DDRB |= (1<<PS2_CS_PIN);
     DDRC |= (1<<TRIG0_PIN);
     DDRC |= (1<<TRIG1_PIN);
-    //DDRC |= (1<<TRIG01_PIN);
-    //DDRC |= (1<<TRIG11_PIN);
 
     // inputs
     DDRB &= ~(1<<SPI_MISO_PIN);
@@ -218,14 +214,25 @@ int main() {
     PORTD &= ~(1<<K321S_PIN);
     PORTD &= ~(1<<K987R_PIN);
     PORTD &= ~(1<<K654P_PIN);
+}
+
+void setup_isr()
+{
+    PCMSK2 |= (1 << PCINT16);
+    PCICR |= (1 << PCIE2);
+    sei();
+}
+
+int main() {
+    uint8_t deltar, deltal, ambistick, select_pressed, matrix_mask_new;
+    uint8_t digital_hpot0, digital_vpot0, digital_hpot1, digital_vpot1, fire0, fire1;
+
+    setup_pins();
 
     // default all CS to high
     POT0_CS_HIGH;
     POT1_CS_HIGH;
     PS2_CS_HIGH;
-
-    // default matrix keypad to no push signal
-    //KSPR_MC_LOW;
 
     // default all triggers to high
     TRIG0_HIGH;
@@ -244,9 +251,8 @@ int main() {
     buttons1 = 0xFF;
 
     kpd_down = KPD_NONE;
-    PCMSK2 |= (1 << PCINT16);
-    PCICR |= (1 << PCIE2);
-    sei();
+
+    setup_isr();
 
     ps2_init(PS2_CS_PIN, SPI_MOSI_PIN, SPI_MISO_PIN, SPI_CLK_PIN);
 
