@@ -42,12 +42,11 @@ clean:
 
 # file targets:
 5200ps2-deluxe.elf: 5200ps2-deluxe.c
-	$(COMPILE) -o 5200ps2-deluxe.elf 5200ps2-deluxe.c
+	$(COMPILE) -o 5200ps2-deluxe.elf 5200ps2-deluxe.c ../lib/ps2.c
 
 5200ps2-deluxe.hex: 5200ps2-deluxe.elf
 	rm -f 5200ps2-deluxe.hex
 	avr-objcopy -j .text -j .data -O ihex 5200ps2-deluxe.elf 5200ps2-deluxe.hex
-#	avr-size --format=avr --mcu=$(DEVICE) 5200ps2-deluxe.elf
 	avr-size 5200ps2-deluxe.elf
 
 # Targets for code debugging and analysis:
@@ -55,4 +54,4 @@ disasm:	5200ps2-deluxe.elf
 	avr-objdump -d 5200ps2-deluxe.elf
 
 cpp:
-	$(COMPILE) -E 5200ps2-deluxe.c
+	$(COMPILE) -E 5200ps2-deluxe.c ../lib/ps2.c
