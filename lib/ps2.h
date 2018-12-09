@@ -24,7 +24,6 @@
 
 #define PS2_GOOD ((device_mode == 0x73) || (device_mode == 0x79))
 
-extern uint8_t ps2_cs_pin, spi_clk_pin, spi_miso_pin, spi_mosi_pin;
 extern uint8_t device_mode, rx, ry, lx, ly, buttons0, buttons1;
 
 void ps2_init(uint8_t cs_pin, uint8_t mosi_pin, uint8_t miso_pin, uint8_t clk_pin);

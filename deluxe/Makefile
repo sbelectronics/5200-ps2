@@ -42,7 +42,7 @@ clean:
 
 # file targets:
 5200ps2-deluxe.elf: 5200ps2-deluxe.c
-	$(COMPILE) -o 5200ps2-deluxe.elf 5200ps2-deluxe.c ../lib/ps2.c
+	$(COMPILE) -o 5200ps2-deluxe.elf 5200ps2-deluxe.c ../lib/ps2.c ../lib/digipot.c
 
 5200ps2-deluxe.hex: 5200ps2-deluxe.elf
 	rm -f 5200ps2-deluxe.hex

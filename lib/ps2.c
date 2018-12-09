@@ -7,6 +7,8 @@
 #include <util/atomic.h>
 #include <util/delay.h>
 
+#include "ps2.h"
+
 #ifndef TRUE
 #define TRUE 1
 #define FALSE 0
@@ -154,6 +156,9 @@ void ps2_init(uint8_t cs_pin, uint8_t mosi_pin, uint8_t miso_pin, uint8_t clk_pi
     DDRB |= (1<< spi_mosi_pin);
     DDRB |= (1<< spi_clk_pin);
     DDRB |= (1<< ps2_cs_pin);
+
+    PS2_CS_HIGH;
+    SPI_CLK_HIGH;
 
     device_mode = 0;
 }

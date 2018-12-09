@@ -12,6 +12,7 @@
 #include <util/delay.h>
 
 #include "../lib/ps2.h"
+#include "../lib/digipot.h"
 
 #ifndef TRUE
 #define TRUE 1
@@ -42,7 +43,7 @@
 #define K987R_PIN PD7
 #define K654P_PIN PD6
 
-#define SPI_MOSI_HIGH PORTB |= (1<<SPI_MOSI_PIN)
+/* #define SPI_MOSI_HIGH PORTB |= (1<<SPI_MOSI_PIN)
 #define SPI_MOSI_LOW PORTB &= ~(1<<SPI_MOSI_PIN)
 #define SPI_CLK_HIGH PORTB |= (1<<SPI_CLK_PIN)
 #define SPI_CLK_LOW PORTB &= ~(1<<SPI_CLK_PIN)
@@ -52,6 +53,7 @@
 #define POT1_CS_LOW PORTB &= ~(1<<POT1_CS_PIN)
 #define PS2_CS_HIGH PORTB |= (1<<PS2_CS_PIN)
 #define PS2_CS_LOW PORTB &= ~(1<<PS2_CS_PIN)
+*/
 
 #define TRIG0_HIGH PORTC |= (1<<TRIG0_PIN)
 #define TRIG0_LOW PORTC &= ~(1<<TRIG0_PIN)
@@ -116,45 +118,7 @@
 
 uint8_t mode, kpd_down, kpd_desired, matrix_mask;
 
-void setPOT0(uint8_t pot_num, uint8_t pot_val);
-void setPOT1(uint8_t pot_num, uint8_t pot_val);
-
 #define absminus(a,b) (a>=b) ? (a-b) : (b-a)
-
-void writeSPI(uint8_t v)
-{
-    uint8_t i;
-    for (i=0; i<8; i++) {
-        if (v & 128) {
-            SPI_MOSI_HIGH;
-        } else {
-            SPI_MOSI_LOW;
-        }
-
-        SPI_CLK_LOW;
-        _delay_us(1);
-
-        v = v << 1;
-
-        SPI_CLK_HIGH;
-    }
-}
-
-void setPOT0(uint8_t pot_num, uint8_t pot_val)
-{
-    POT0_CS_LOW;
-    writeSPI(0x11 + pot_num);
-    writeSPI(pot_val);
-    POT0_CS_HIGH;
-}
-
-void setPOT1(uint8_t pot_num, uint8_t pot_val)
-{
-    POT1_CS_LOW;
-    writeSPI(0x11 + pot_num);
-    writeSPI(pot_val);
-    POT1_CS_HIGH;
-}
 
 uint8_t max(uint8_t x, uint8_t y)
 {
@@ -177,13 +141,13 @@ ISR(PCINT2_vect)
 void setup_pins()
 {
     // outputs
-    DDRB |= (1<<SPI_MOSI_PIN);
+/*    DDRB |= (1<<SPI_MOSI_PIN);
     DDRB |= (1<<SPI_CLK_PIN);
     DDRB |= (1<<POT0_CS_PIN);
     DDRB |= (1<<POT1_CS_PIN);
-    DDRB |= (1<<PS2_CS_PIN);
+    DDRB |= (1<<PS2_CS_PIN);*/
     DDRC |= (1<<TRIG0_PIN);
-    DDRC |= (1<<TRIG1_PIN);
+    DDRC |= (1<<TRIG1_PIN); 
 
     // inputs
     DDRB &= ~(1<<SPI_MISO_PIN);
@@ -228,19 +192,15 @@ int main() {
     uint8_t digital_hpot0, digital_vpot0, digital_hpot1, digital_vpot1, fire0, fire1;
 
     setup_pins();
-
-    // default all CS to high
-    POT0_CS_HIGH;
-    POT1_CS_HIGH;
-    PS2_CS_HIGH;
+    ps2_init(PS2_CS_PIN, SPI_MOSI_PIN, SPI_MISO_PIN, SPI_CLK_PIN);
+    initPOT0(POT0_CS_PIN, SPI_MOSI_PIN, SPI_CLK_PIN);
+    initPOT1(POT1_CS_PIN);
 
     // default all triggers to high
     TRIG0_HIGH;
     TRIG1_HIGH;
     TRIG01_HIGH;
     TRIG11_HIGH;
-
-    SPI_CLK_HIGH;
 
     mode = MODE_AMBIDEXTROUS;
     ambistick = 0;
@@ -253,8 +213,6 @@ int main() {
     kpd_down = KPD_NONE;
 
     setup_isr();
-
-    ps2_init(PS2_CS_PIN, SPI_MOSI_PIN, SPI_MISO_PIN, SPI_CLK_PIN);
 
     while (1) {
         // Start by assuming the pot is in the center, the fire buttons are not pressed, and the keypad is unpressed.
